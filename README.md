@@ -1,8 +1,8 @@
-# 💰 Conversor de Monedas en Java
+Conversor de Monedas en Java
 
 Un conversor de monedas avanzado desarrollado en Java que utiliza la API de ExchangeRate-API para obtener tasas de cambio en tiempo real.
 
-## ✨ Características
+ Características
 
 - ✅ **Conversión en tiempo real** usando ExchangeRate-API
 - ✅ **Soporte para 15+ monedas** diferentes
@@ -11,14 +11,14 @@ Un conversor de monedas avanzado desarrollado en Java que utiliza la API de Exch
 - ✅ **Manejo de errores** robusto
 - ✅ **Código abierto** y fácil de extender
 
-## 🛠️ Tecnologías Utilizadas
+ Tecnologías Utilizadas
 
 - **Java 11+**
 - **GSON** - Para análisis de JSON
 - **HttpClient** - Para solicitudes HTTP
 - **ExchangeRate-API** - Para tasas de cambio
 
-## 📦 Instalación
+ Instalación
 
 ### Prerrequisitos
 - Java JDK 11 o superior
