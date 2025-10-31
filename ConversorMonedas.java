@@ -1,0 +1,273 @@
+import java.util.*;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.io.*;
+import java.util.*;
+
+public class ConversorMonedas {
+    
+    private static final String API_KEY = "338449b0ebd7b33afd74455f";
+    private static final String BASE_URL = "https://v6.exchangerate-api.com/v6/" + API_KEY + "/latest/";
+    private static final String ARCHIVO_HISTORIAL = "historial_conversiones.txt";
+    
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final Gson gson = new Gson();
+    private static final Scanner scanner = new Scanner(System.in);
+    
+    // Mapa de códigos de moneda a nombres completos
+    private static final Map<String, String> MONEDAS = Map.of(
+        "USD", "Dólar Estadounidense",
+        "EUR", "Euro",
+        "GBP", "Libra Esterlina",
+        "JPY", "Yen Japonés",
+        "CAD", "Dólar Canadiense",
+        "AUD", "Dólar Australiano",
+        "CHF", "Franco Suizo",
+        "CNY", "Yuan Chino",
+        "MXN", "Peso Mexicano",
+        "BRL", "Real Brasileño",
+        "ARS", "Peso Argentino",
+        "CLP", "Peso Chileno",
+        "COP", "Peso Colombiano",
+        "PEN", "Sol Peruano",
+        "UYU", "Peso Uruguayo",
+        "VES", "Bolívar Soberano"
+    );
+    
+    public static void main(String[] args) {
+        System.out.println("💱 CONVERSOR DE MONEDAS AVANZADO 💱");
+        System.out.println("=====================================");
+        
+        boolean ejecutando = true;
+        
+        while (ejecutando) {
+            mostrarMenuPrincipal();
+            String opcion = scanner.nextLine();
+            
+            switch (opcion) {
+                case "1":
+                    realizarConversion();
+                    break;
+                case "2":
+                    mostrarMonedasSoportadas();
+                    break;
+                case "3":
+                    mostrarHistorial();
+                    break;
+                case "4":
+                    System.out.println("👋 ¡Gracias por usar el conversor!");
+                    ejecutando = false;
+                    break;
+                default:
+                    System.out.println("❌ Opción no válida. Intente nuevamente.");
+            }
+        }
+        
+        scanner.close();
+    }
+    
+    private static void mostrarMenuPrincipal() {
+        System.out.println("\n=== MENÚ PRINCIPAL ===");
+        System.out.println("1. Realizar conversión");
+        System.out.println("2. Monedas soportadas");
+        System.out.println("3. Ver historial");
+        System.out.println("4. Salir");
+        System.out.print("Seleccione una opción: ");
+    }
+    
+    private static void realizarConversion() {
+        try {
+            System.out.println("\n💵 CONVERSIÓN DE MONEDAS");
+            System.out.println("========================");
+            
+            // Selección de moneda origen
+            System.out.print("Moneda origen (ej: USD): ");
+            String monedaOrigen = scanner.nextLine().toUpperCase();
+            
+            if (!MONEDAS.containsKey(monedaOrigen)) {
+                System.out.println("❌ Moneda no soportada: " + monedaOrigen);
+                return;
+            }
+            
+            // Obtener tasas de cambio
+            JsonObject tasas = obtenerTasasDeCambio(monedaOrigen);
+            if (tasas == null) {
+                System.out.println("❌ Error al obtener tasas de cambio");
+                return;
+            }
+            
+            JsonObject conversionRates = tasas.getAsJsonObject("conversion_rates");
+            
+            // Selección de moneda destino
+            System.out.print("Moneda destino (ej: EUR): ");
+            String monedaDestino = scanner.nextLine().toUpperCase();
+            
+            if (!conversionRates.has(monedaDestino)) {
+                System.out.println("❌ Moneda destino no disponible: " + monedaDestino);
+                return;
+            }
+            
+            // Ingreso de cantidad
+            System.out.print("Cantidad a convertir: ");
+            double cantidad;
+            try {
+                cantidad = Double.parseDouble(scanner.nextLine());
+                if (cantidad <= 0) {
+                    System.out.println("❌ La cantidad debe ser mayor a 0");
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("❌ Cantidad no válida");
+                return;
+            }
+            
+            // Realizar conversión
+            double tasa = conversionRates.get(monedaDestino).getAsDouble();
+            double resultado = cantidad * tasa;
+            
+            // Mostrar resultado
+            System.out.println("\n✅ RESULTADO DE LA CONVERSIÓN:");
+            System.out.printf("💰 %.2f %s = %.2f %s%n", 
+                cantidad, monedaOrigen, resultado, monedaDestino);
+            System.out.printf("📊 Tasa de cambio: 1 %s = %.4f %s%n", 
+                monedaOrigen, tasa, monedaDestino);
+            
+            // Guardar en historial
+            guardarEnHistorial(monedaOrigen, monedaDestino, cantidad, resultado, tasa);
+            
+        } catch (Exception e) {
+            System.out.println("❌ Error durante la conversión: " + e.getMessage());
+        }
+    }
+    
+    private static JsonObject obtenerTasasDeCambio(String monedaBase) {
+        try {
+            String url = BASE_URL + monedaBase;
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+            
+            HttpResponse<String> response = httpClient.send(
+                request, HttpResponse.BodyHandlers.ofString()
+            );
+            
+            if (response.statusCode() == 200) {
+                JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+                
+                if (jsonResponse.get("result").getAsString().equals("success")) {
+                    return jsonResponse;
+                } else {
+                    System.out.println("❌ Error en la API: " + jsonResponse.get("result"));
+                    return null;
+                }
+            } else {
+                System.out.println("❌ Error HTTP: " + response.statusCode());
+                return null;
+            }
+            
+        } catch (Exception e) {
+            System.out.println("❌ Error al conectar con la API: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private static void guardarEnHistorial(String monedaOrigen, String monedaDestino, 
+                                         double cantidad, double resultado, double tasa) {
+        try (FileWriter writer = new FileWriter(ARCHIVO_HISTORIAL, true)) {
+            String timestamp = LocalDateTime.now().format(
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            );
+            
+            String registro = String.format(
+                "[%s] %.2f %s → %.2f %s (Tasa: %.4f)%n",
+                timestamp, cantidad, monedaOrigen, resultado, monedaDestino, tasa
+            );
+            
+            writer.write(registro);
+            System.out.println("📝 Conversión guardada en el historial");
+            
+        } catch (IOException e) {
+            System.out.println("❌ Error al guardar en historial: " + e.getMessage());
+        }
+    }
+    
+    private static void mostrarMonedasSoportadas() {
+        System.out.println("\n💳 MONEDAS SOPORTADAS");
+        System.out.println("=====================");
+        
+        int contador = 0;
+        for (Map.Entry<String, String> moneda : MONEDAS.entrySet()) {
+            System.out.printf("%-5s - %-25s", moneda.getKey(), moneda.getValue());
+            contador++;
+            
+            if (contador % 2 == 0) {
+                System.out.println();
+            } else {
+                System.out.print(" | ");
+            }
+        }
+        System.out.println("\n\nTotal: " + MONEDAS.size() + " monedas soportadas");
+    }
+    
+    private static void mostrarHistorial() {
+        File archivo = new File(ARCHIVO_HISTORIAL);
+        
+        if (!archivo.exists()) {
+            System.out.println("📭 No hay historial de conversiones");
+            return;
+        }
+        
+        try (Scanner fileScanner = new Scanner(archivo)) {
+            System.out.println("\n📊 HISTORIAL DE CONVERSIONES");
+            System.out.println("============================");
+            
+            int contador = 0;
+            while (fileScanner.hasNextLine()) {
+                System.out.println(fileScanner.nextLine());
+                contador++;
+            }
+            
+            if (contador == 0) {
+                System.out.println("📭 El historial está vacío");
+            } else {
+                System.out.println("\nTotal de conversiones: " + contador);
+            }
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("❌ Error al leer el historial: " + e.getMessage());
+        }
+    }
+    
+    // Método adicional para conversión múltiple
+    public static void conversionMultiple(String monedaOrigen, double cantidad, String[] monedasDestino) {
+        System.out.println("\n🔄 CONVERSIÓN MÚLTIPLE");
+        System.out.println("======================");
+        
+        JsonObject tasas = obtenerTasasDeCambio(monedaOrigen);
+        if (tasas == null) return;
+        
+        JsonObject conversionRates = tasas.getAsJsonObject("conversion_rates");
+        
+        for (String monedaDestino : monedasDestino) {
+            if (conversionRates.has(monedaDestino)) {
+                double tasa = conversionRates.get(monedaDestino).getAsDouble();
+                double resultado = cantidad * tasa;
+                
+                System.out.printf("💰 %.2f %s = %.2f %s (Tasa: %.4f)%n", 
+                    cantidad, monedaOrigen, resultado, monedaDestino, tasa);
+            } else {
+                System.out.printf("❌ Moneda no disponible: %s%n", monedaDestino);
+            }
+        }
+    }
+}
